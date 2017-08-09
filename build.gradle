@@ -11,6 +11,8 @@ sourceCompatibility = 1.8
 
 repositories {
     mavenCentral()
+    jcenter()
+
 }
 
 dependencies {
@@ -23,7 +25,7 @@ dependencies {
 
 task javadocJar(type: Jar) {
     classifier = 'javadoc'
-    from Javadoc
+    from javadoc
 }
 
 task sourcesJar(type: Jar) {
@@ -40,7 +42,7 @@ signing {
 }
 
 group = "com.testvagrant.devicemanagement"
-archivesBaseName = "deviceManager"
+archivesBaseName = "devicemanagement"
 version = "1.0.0"
 
 uploadArchives {
@@ -64,7 +66,7 @@ uploadArchives {
                 url 'https://bitbucket.org/testvagrant/devicemanagement'
 
                 scm {
-                    connection 'scm:git@bitbucket.org:testvagrant/devicemanagement.git'
+                    connection 'scm:https://sukesh_testvagrant@bitbucket.org/testvagrant/devicemanagement.git'
 //                    developerConnection 'scm:svn:https://foo.googlecode.com/svn/trunk/'
                     url 'https://bitbucket.org/testvagrant/devicemanagement'
                 }
