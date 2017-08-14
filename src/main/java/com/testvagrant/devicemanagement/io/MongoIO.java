@@ -32,7 +32,7 @@ import com.testvagrant.commons.entities.device.OSVersion;
 import com.testvagrant.commons.entities.device.Platform;
 import com.testvagrant.commons.entities.device.Status;
 import com.testvagrant.devicemanagement.core.MongoBase;
-import com.testvagrant.devicemanagement.utils.DeviceDetailsHelper;
+import com.testvagrant.mdb.utils.OSVersionMatcher;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 
@@ -43,7 +43,7 @@ import static com.testvagrant.devicemanagement.core.Constants.*;
 
 public class MongoIO {
     protected static ObjectId latestBuildID;
-    protected MongoClient mongoClient;
+    protected final MongoClient mongoClient;
 
     public MongoIO() {
         mongoClient = MongoBase.getInstance();
@@ -92,7 +92,7 @@ public class MongoIO {
 
     protected DeviceDetails readDocument(Document document) {
         Platform platform = Platform.valueOf(document.getString(KEY_DEVICES_PLATFORM));
-        OSVersion osVersion = new DeviceDetailsHelper().getOSVersion((String) document.get(KEY_DEVICES_PLATFORM_VERSION),platform);
+        OSVersion osVersion = new OSVersionMatcher().getOSVersion(platform,(String) document.get(KEY_DEVICES_PLATFORM_VERSION));
         Status status = Status.valueOf(document.getString(KEY_DEVICES_STATUS));
         DeviceType deviceType = DeviceType.valueOf(document.getString(KEY_DEVICES_RUNSON));
         DeviceDetails deviceDetails = new DeviceDetails();

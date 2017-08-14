@@ -19,6 +19,7 @@ package com.testvagrant.devicemanagement.io;
 
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.annotations.ThreadSafe;
 import com.mongodb.client.DistinctIterable;
 import com.mongodb.client.MongoCollection;
 import com.testvagrant.commons.entities.DeviceDetails;
@@ -32,19 +33,21 @@ import org.bson.types.ObjectId;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.json.simple.JSONObject;
 
-import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
 
 import static com.mongodb.client.model.Filters.eq;
 import static com.testvagrant.devicemanagement.core.Constants.*;
 
+@ThreadSafe
 public class MongoWriter extends MongoIO {
 
     private ObjectMapper objectMapper;
+    final ReentrantLock lock = new ReentrantLock();
     public MongoWriter() {
         super();
         objectMapper = new ObjectMapper();
@@ -133,47 +136,45 @@ public class MongoWriter extends MongoIO {
 
 
 
-    public synchronized DeviceDetails updateFirstAvailableDeviceToEngaged(JSONObject testFeed) throws DeviceEngagedException {
-        System.out.println("Updating first available device to Engaged");
-        BasicDBObject andQuery = new DeviceMatcherFunction().prepareQuery(testFeed).append(KEY_BUILD_ID, latestBuildID);
+    public DeviceDetails updateFirstAvailableDeviceToEngaged(JSONObject testFeed) throws DeviceEngagedException {
         DeviceDetails deviceDetails = null;
-        synchronized (Thread.currentThread()) {
+        lock.tryLock();
+        try {
+            System.out.println("Updating first available device to Engaged");
+            BasicDBObject andQuery = new DeviceMatcherFunction().prepareQuery(testFeed).append(KEY_BUILD_ID, latestBuildID);
             MongoCollection<Document> collection = mongoClient.getDatabase(DATABASE_NAME).getCollection(COLLECTION_DEVICES);
-            Document first = collection.find(andQuery).first();
-            System.out.println(first.toString());
             try {
-                collection.updateOne(first, new Document(QUERY_SET, new Document(KEY_DEVICES_STATUS, "Engaged")));
+                Document first = collection.findOneAndUpdate(andQuery,new Document(QUERY_SET, new Document(KEY_DEVICES_STATUS, "Engaged")));
+                deviceDetails = objectMapper.readValue(first.toJson(), DeviceDetails.class);
             } catch (Exception e) {
                 throw new DeviceEngagedException();
             }
-
-            try {
-                deviceDetails = objectMapper.readValue(first.toJson(), DeviceDetails.class);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            System.out.println(String.format("Updated device %s to engaged", deviceDetails.getDeviceName()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            lock.unlock();
         }
-        System.out.println(String.format("Updated device %s to engaged",deviceDetails.getDeviceName()));
+
         return deviceDetails;
     }
 
-    public synchronized DeviceDetails updateFirstAvailableDeviceToEngaged(String udid) throws DeviceEngagedException {
-        System.out.println(latestBuildID);
-        BasicDBObject andQuery = new BasicDBObject(KEY_SCENARIOS_DEVICE_UDID,udid).append(KEY_BUILD_ID, latestBuildID);
-        MongoCollection<Document> collection = mongoClient.getDatabase(DATABASE_NAME).getCollection(COLLECTION_DEVICES);
-
-        Document first = collection.find(andQuery).first();
-        System.out.println(first.toString());
-        try {
-            collection.updateOne(first, new Document(QUERY_SET, new Document(KEY_DEVICES_STATUS, "Engaged")));
-        } catch (Exception e) {
-            throw new DeviceEngagedException();
-        }
+    public DeviceDetails updateFirstAvailableDeviceToEngaged(String udid) throws DeviceEngagedException {
         DeviceDetails deviceDetails = null;
+        lock.lock();
         try {
-            deviceDetails = objectMapper.readValue(first.toJson(), DeviceDetails.class);
-        } catch (IOException e) {
+            BasicDBObject andQuery = new BasicDBObject(KEY_SCENARIOS_DEVICE_UDID, udid).append(KEY_BUILD_ID, latestBuildID);
+            MongoCollection<Document> collection = mongoClient.getDatabase(DATABASE_NAME).getCollection(COLLECTION_DEVICES);
+            try {
+                Document first = collection.findOneAndUpdate(andQuery,new Document(QUERY_SET, new Document(KEY_DEVICES_STATUS, "Engaged")));
+                deviceDetails = objectMapper.readValue(first.toJson(), DeviceDetails.class);
+            } catch (Exception e) {
+                throw new DeviceEngagedException();
+            }
+        } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            lock.unlock();
         }
         return deviceDetails;
     }
